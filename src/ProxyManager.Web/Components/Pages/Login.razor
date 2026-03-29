@@ -9,6 +9,10 @@
 {
     <div class="alert alert-danger">Invalid username or password.</div>
 }
+else if (_lockedOut)
+{
+    <div class="alert alert-warning">Account is temporarily locked due to repeated failed logins.</div>
+}
 
 <form method="post" action="/auth/login">
     <AntiforgeryToken />
@@ -28,9 +32,11 @@
     public string? Error { get; set; }
 
     private bool _invalidCredentials;
+    private bool _lockedOut;
 
     protected override void OnParametersSet()
     {
         _invalidCredentials = string.Equals(Error, "invalid", StringComparison.OrdinalIgnoreCase);
+        _lockedOut = string.Equals(Error, "locked", StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -5,7 +5,7 @@ namespace ProxyManager.Infrastructure.Runtime;
 
 public sealed class CryptographicPasswordGenerator : IPasswordGenerator
 {
-    private const string Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_=+[]{}";
+    private const string Alphabet = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()-_";
 
     public string GenerateStrongPassword()
     {

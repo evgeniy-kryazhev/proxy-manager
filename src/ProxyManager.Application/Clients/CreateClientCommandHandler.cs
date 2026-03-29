@@ -38,7 +38,7 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
         }
 
         var password = _passwordGenerator.GenerateStrongPassword();
-        ClientPassword.Create(password);
+        password = ClientPassword.Create(password).Value;
 
         await _runtimeConfigGateway.AddClientAsync(username, password, cancellationToken);
 

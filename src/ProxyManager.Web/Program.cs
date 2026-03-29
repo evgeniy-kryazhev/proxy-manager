@@ -42,15 +42,25 @@ app.UseAntiforgery();
 
 app.MapPost("/auth/login", async (SignInManager<ApplicationUser> signInManager, [FromForm] string username, [FromForm] string password) =>
 {
-    var result = await signInManager.PasswordSignInAsync(username, password, isPersistent: true, lockoutOnFailure: false);
-    return result.Succeeded ? Results.Redirect("/") : Results.Redirect("/login?error=invalid");
-}).DisableAntiforgery();
+    var result = await signInManager.PasswordSignInAsync(username, password, isPersistent: true, lockoutOnFailure: true);
+    if (result.Succeeded)
+    {
+        return Results.Redirect("/");
+    }
+
+    if (result.IsLockedOut)
+    {
+        return Results.Redirect("/login?error=locked");
+    }
+
+    return Results.Redirect("/login?error=invalid");
+});
 
 app.MapPost("/auth/logout", async (SignInManager<ApplicationUser> signInManager) =>
 {
     await signInManager.SignOutAsync();
     return Results.Redirect("/login");
-}).DisableAntiforgery();
+});
 
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();

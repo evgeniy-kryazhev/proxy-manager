@@ -30,7 +30,7 @@ public sealed class RegenerateClientPasswordCommandHandler : IRequestHandler<Reg
     {
         var username = ClientUsername.Create(request.Username).Value;
         var password = _passwordGenerator.GenerateStrongPassword();
-        ClientPassword.Create(password);
+        password = ClientPassword.Create(password).Value;
 
         await _runtimeConfigGateway.UpdateClientPasswordAsync(username, password, cancellationToken);
 
