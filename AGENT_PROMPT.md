@@ -44,12 +44,14 @@ The first supported proxy provider is **Hysteria 2**, but the system must be arc
 
 ## Required solution structure
 
-Create a multi-project solution with these projects:
+Create a multi-project solution with all source projects placed under a `src/` directory.
 
-- `ProxyManager.Domain`
-- `ProxyManager.Application`
-- `ProxyManager.Infrastructure`
-- `ProxyManager.Web`
+Required structure:
+
+- `src/ProxyManager.Domain`
+- `src/ProxyManager.Application`
+- `src/ProxyManager.Infrastructure`
+- `src/ProxyManager.Web`
 
 ### Domain responsibilities
 - Pure business model
@@ -429,7 +431,7 @@ Prefer working, reviewable progress over speculative overengineering.
 The task is done when:
 
 - the solution builds successfully
-- the project is split into Domain / Application / Infrastructure / Web
+- the project is split into Domain / Application / Infrastructure / Web under the `src/` directory
 - Blazor uses mediator directly, not internal API calls
 - Identity works for Blazor login
 - Hysteria users can be read from `/opt/hysteria/config.yaml`
