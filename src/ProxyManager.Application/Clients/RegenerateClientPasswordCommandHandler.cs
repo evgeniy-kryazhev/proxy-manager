@@ -35,7 +35,7 @@ public sealed class RegenerateClientPasswordCommandHandler : IRequestHandler<Reg
         await _runtimeConfigGateway.UpdateClientPasswordAsync(username, password, cancellationToken);
 
         var metadata = await _metadataRepository.GetByUsernameAsync(username, cancellationToken)
-            ?? new ClientMetadataRecord(username, null, DateTimeOffset.UtcNow, ClientStatus.Active, "Hysteria2", null);
+            ?? new ClientMetadataRecord(username, null, DateTimeOffset.UtcNow, ClientStatus.Active, ProxyProviders.Hysteria2, null);
 
         metadata = metadata with
         {
@@ -44,7 +44,7 @@ public sealed class RegenerateClientPasswordCommandHandler : IRequestHandler<Reg
         };
 
         await _metadataRepository.UpsertAsync(metadata, cancellationToken);
-        await _mediator.Publish(new ProxyConfigurationChangedNotification("Hysteria2"), cancellationToken);
+        await _mediator.Publish(new ProxyConfigurationChangedNotification(ProxyProviders.Hysteria2), cancellationToken);
 
         return new ClientViewModel(
             Username: username,

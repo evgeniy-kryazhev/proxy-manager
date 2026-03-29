@@ -47,8 +47,7 @@ cat > /tmp/hysteria/config.yaml <<'YAML'
 auth:
   type: userpass
   userpass:
-    - username: existing
-      password: oldpass123456
+    main: "oldpass123456"
 YAML
 ```
 
@@ -68,9 +67,10 @@ dotnet run --project src/ProxyManager.Web/ProxyManager.Web.csproj
 
 ## Persistence
 
-- SQL Server is the default configured provider (`ConnectionStrings:SqlServer` in `appsettings.json`)
-- Development config uses SQLite (`Data Source=proxy-manager.db`) for local portability
+- SQL Server is the default configured provider (`Database:Provider=SqlServer`, `ConnectionStrings:DefaultConnection`)
+- Development config uses SQLite (`Database:Provider=Sqlite`, `Data Source=proxy-manager.db`) for local portability
 - EF Core stores Identity and client metadata (`ClientMetadata`)
+- Startup applies EF Core migrations (`Database.Migrate()`) instead of `EnsureCreated()`
 
 ## Extension points
 

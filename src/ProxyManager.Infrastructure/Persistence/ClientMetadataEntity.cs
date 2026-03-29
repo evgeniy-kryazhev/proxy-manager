@@ -14,7 +14,7 @@ public sealed class ClientMetadataEntity
 
     public ClientStatus Status { get; set; }
 
-    public string Provider { get; set; } = "Hysteria2";
+    public string Provider { get; set; } = ProxyManager.Infrastructure.Providers.Hysteria.HysteriaProvider.Name;
 
     public DateTimeOffset? LastPasswordRegeneratedAt { get; set; }
 }

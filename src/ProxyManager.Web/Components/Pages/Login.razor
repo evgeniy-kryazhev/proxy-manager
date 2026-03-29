@@ -16,6 +16,7 @@ else if (_lockedOut)
 
 <form method="post" action="/auth/login">
     <AntiforgeryToken />
+    <input type="hidden" name="returnUrl" value="@ReturnUrl" />
     <div class="mb-3">
         <label class="form-label" for="username">Username</label>
         <input class="form-control" id="username" name="username" autocomplete="username" required />
@@ -30,6 +31,9 @@ else if (_lockedOut)
 @code {
     [SupplyParameterFromQuery(Name = "error")]
     public string? Error { get; set; }
+
+    [SupplyParameterFromQuery(Name = "ReturnUrl")]
+    public string? ReturnUrl { get; set; }
 
     private bool _invalidCredentials;
     private bool _lockedOut;

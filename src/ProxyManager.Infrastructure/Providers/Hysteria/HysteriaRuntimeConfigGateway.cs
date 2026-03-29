@@ -6,6 +6,10 @@ namespace ProxyManager.Infrastructure.Providers.Hysteria;
 
 public sealed class HysteriaRuntimeConfigGateway : IProxyRuntimeConfigGateway
 {
+    private static readonly YamlScalarNode UserpassKey = new("userpass");
+    private static readonly YamlScalarNode UsernameKey = new("username");
+    private static readonly YamlScalarNode PasswordKey = new("password");
+
     private readonly HysteriaOptions _options;
 
     public HysteriaRuntimeConfigGateway(HysteriaOptions options)
@@ -15,72 +19,61 @@ public sealed class HysteriaRuntimeConfigGateway : IProxyRuntimeConfigGateway
 
     public async Task<IReadOnlyCollection<RuntimeClientRecord>> GetClientsAsync(CancellationToken cancellationToken)
     {
-        var (stream, userpass) = await LoadStreamAndUserpassAsync(cancellationToken);
-        return userpass
-            .OfType<YamlMappingNode>()
+        var (stream, auth) = await LoadStreamAndAuthAsync(cancellationToken);
+        var users = EnumerateUserpassEntries(auth);
+
+        return users
             .Select(item => new RuntimeClientRecord(
-                Username: ReadValue(item, "username"),
-                Password: ReadValue(item, "password"),
-                Provider: "Hysteria2"))
+                Username: item.Username,
+                Password: item.Password,
+                Provider: HysteriaProvider.Name))
             .Where(x => !string.IsNullOrWhiteSpace(x.Username))
             .ToArray();
     }
 
     public async Task AddClientAsync(string username, string password, CancellationToken cancellationToken)
     {
-        var (stream, userpass) = await LoadStreamAndUserpassAsync(cancellationToken);
+        var (stream, auth) = await LoadStreamAndAuthAsync(cancellationToken);
+        var userpass = GetOrCreateUserpassMap(auth);
 
-        if (userpass.OfType<YamlMappingNode>().Any(x => string.Equals(ReadValue(x, "username"), username, StringComparison.OrdinalIgnoreCase)))
+        if (ContainsUser(userpass, username))
         {
             throw new InvalidOperationException($"Client '{username}' already exists in runtime config.");
         }
 
-        userpass.Add(new YamlMappingNode
-        {
-            { "username", username },
-            { "password", password }
-        });
+        userpass.Children[new YamlScalarNode(username)] = new YamlScalarNode(password);
 
         await SaveAsync(stream, cancellationToken);
     }
 
     public async Task RemoveClientAsync(string username, CancellationToken cancellationToken)
     {
-        var (stream, userpass) = await LoadStreamAndUserpassAsync(cancellationToken);
+        var (stream, auth) = await LoadStreamAndAuthAsync(cancellationToken);
+        var userpass = GetOrCreateUserpassMap(auth);
+        var keyToRemove = GetExistingUsernameKey(userpass, username);
 
-        var toRemove = userpass
-            .OfType<YamlMappingNode>()
-            .Where(x => string.Equals(ReadValue(x, "username"), username, StringComparison.OrdinalIgnoreCase))
-            .ToArray();
-
-        foreach (var item in toRemove)
+        if (keyToRemove is not null)
         {
-            userpass.Children.Remove(item);
-        }
-
-        if (toRemove.Length > 0)
-        {
+            userpass.Children.Remove(keyToRemove);
             await SaveAsync(stream, cancellationToken);
         }
     }
 
     public async Task UpdateClientPasswordAsync(string username, string newPassword, CancellationToken cancellationToken)
     {
-        var (stream, userpass) = await LoadStreamAndUserpassAsync(cancellationToken);
-        var existing = userpass
-            .OfType<YamlMappingNode>()
-            .FirstOrDefault(x => string.Equals(ReadValue(x, "username"), username, StringComparison.OrdinalIgnoreCase));
-
-        if (existing is null)
+        var (stream, auth) = await LoadStreamAndAuthAsync(cancellationToken);
+        var userpass = GetOrCreateUserpassMap(auth);
+        var existingKey = GetExistingUsernameKey(userpass, username);
+        if (existingKey is null)
         {
             throw new InvalidOperationException($"Client '{username}' not found in runtime config.");
         }
 
-        existing.Children[new YamlScalarNode("password")] = new YamlScalarNode(newPassword);
+        userpass.Children[existingKey] = new YamlScalarNode(newPassword);
         await SaveAsync(stream, cancellationToken);
     }
 
-    private async Task<(YamlStream Stream, YamlSequenceNode Userpass)> LoadStreamAndUserpassAsync(CancellationToken cancellationToken)
+    private async Task<(YamlStream Stream, YamlMappingNode Auth)> LoadStreamAndAuthAsync(CancellationToken cancellationToken)
     {
         if (!File.Exists(_options.ConfigPath))
         {
@@ -104,8 +97,7 @@ public sealed class HysteriaRuntimeConfigGateway : IProxyRuntimeConfigGateway
             throw new InvalidOperationException("Only auth.type=userpass is supported.");
         }
 
-        var userpass = GetOrCreateSequence(auth, "userpass");
-        return (stream, userpass);
+        return (stream, auth);
     }
 
     private static YamlMappingNode GetOrCreateMapping(YamlMappingNode parent, string key)
@@ -121,16 +113,25 @@ public sealed class HysteriaRuntimeConfigGateway : IProxyRuntimeConfigGateway
         return created;
     }
 
-    private static YamlSequenceNode GetOrCreateSequence(YamlMappingNode parent, string key)
+    private static YamlMappingNode GetOrCreateUserpassMap(YamlMappingNode auth)
     {
-        var keyNode = new YamlScalarNode(key);
-        if (parent.Children.TryGetValue(keyNode, out var node) && node is YamlSequenceNode sequence)
+        if (auth.Children.TryGetValue(UserpassKey, out var existingNode))
         {
-            return sequence;
+            if (existingNode is YamlMappingNode mapping)
+            {
+                return mapping;
+            }
+
+            if (existingNode is YamlSequenceNode sequence)
+            {
+                var converted = ConvertSequenceToMap(sequence);
+                auth.Children[UserpassKey] = converted;
+                return converted;
+            }
         }
 
-        var created = new YamlSequenceNode();
-        parent.Children[keyNode] = created;
+        var created = new YamlMappingNode();
+        auth.Children[UserpassKey] = created;
         return created;
     }
 
@@ -147,17 +148,99 @@ public sealed class HysteriaRuntimeConfigGateway : IProxyRuntimeConfigGateway
         return created;
     }
 
-    private static string ReadValue(YamlMappingNode node, string key)
+    private static IReadOnlyCollection<(string Username, string Password)> EnumerateUserpassEntries(YamlMappingNode auth)
     {
-        return node.Children.TryGetValue(new YamlScalarNode(key), out var value) && value is YamlScalarNode scalar
+        if (!auth.Children.TryGetValue(UserpassKey, out var node))
+        {
+            return Array.Empty<(string Username, string Password)>();
+        }
+
+        if (node is YamlMappingNode map)
+        {
+            return map.Children
+                .OfType<KeyValuePair<YamlNode, YamlNode>>()
+                .Select(x => (
+                    Username: (x.Key as YamlScalarNode)?.Value ?? string.Empty,
+                    Password: (x.Value as YamlScalarNode)?.Value ?? string.Empty))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Username))
+                .ToArray();
+        }
+
+        if (node is YamlSequenceNode sequence)
+        {
+            return sequence
+                .OfType<YamlMappingNode>()
+                .Select(item => (
+                    Username: ReadValue(item, UsernameKey),
+                    Password: ReadValue(item, PasswordKey)))
+                .Where(x => !string.IsNullOrWhiteSpace(x.Username))
+                .ToArray();
+        }
+
+        return Array.Empty<(string Username, string Password)>();
+    }
+
+    private static YamlMappingNode ConvertSequenceToMap(YamlSequenceNode sequence)
+    {
+        var converted = new YamlMappingNode();
+        foreach (var item in sequence.OfType<YamlMappingNode>())
+        {
+            var username = ReadValue(item, UsernameKey);
+            if (string.IsNullOrWhiteSpace(username))
+            {
+                continue;
+            }
+
+            converted.Children[new YamlScalarNode(username)] = new YamlScalarNode(ReadValue(item, PasswordKey));
+        }
+
+        return converted;
+    }
+
+    private static bool ContainsUser(YamlMappingNode userpass, string username)
+    {
+        return GetExistingUsernameKey(userpass, username) is not null;
+    }
+
+    private static YamlScalarNode? GetExistingUsernameKey(YamlMappingNode userpass, string username)
+    {
+        return userpass.Children.Keys
+            .OfType<YamlScalarNode>()
+            .FirstOrDefault(x => string.Equals(x.Value, username, StringComparison.OrdinalIgnoreCase));
+    }
+
+    private static string ReadValue(YamlMappingNode node, YamlScalarNode key)
+    {
+        return node.Children.TryGetValue(key, out var value) && value is YamlScalarNode scalar
             ? scalar.Value ?? string.Empty
             : string.Empty;
     }
 
     private async Task SaveAsync(YamlStream stream, CancellationToken cancellationToken)
     {
-        await using var output = File.CreateText(_options.ConfigPath);
-        stream.Save(output, assignAnchors: false);
-        await output.FlushAsync(cancellationToken);
+        var directory = Path.GetDirectoryName(_options.ConfigPath);
+        if (string.IsNullOrWhiteSpace(directory))
+        {
+            throw new InvalidOperationException("Invalid Hysteria config path directory.");
+        }
+
+        Directory.CreateDirectory(directory);
+
+        var tempPath = Path.Combine(directory, $"{Path.GetFileName(_options.ConfigPath)}.{Guid.NewGuid():N}.tmp");
+        await using (var output = File.CreateText(tempPath))
+        {
+            stream.Save(output, assignAnchors: false);
+            await output.FlushAsync(cancellationToken);
+        }
+
+        if (File.Exists(_options.ConfigPath))
+        {
+            var backupPath = $"{_options.ConfigPath}.bak";
+            File.Copy(_options.ConfigPath, backupPath, overwrite: true);
+            File.Move(tempPath, _options.ConfigPath, overwrite: true);
+            return;
+        }
+
+        File.Move(tempPath, _options.ConfigPath);
     }
 }
