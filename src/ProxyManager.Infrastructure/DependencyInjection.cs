@@ -3,6 +3,7 @@ using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using ProxyManager.Application.Abstractions;
+using ProxyManager.Infrastructure.Abstractions;
 using ProxyManager.Infrastructure.Configuration;
 using ProxyManager.Infrastructure.Identity;
 using ProxyManager.Infrastructure.Persistence;
@@ -15,16 +16,22 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddInfrastructure(this IServiceCollection services, IConfiguration configuration)
     {
-        var connectionString = configuration.GetConnectionString("SqlServer")
+        var connectionString = configuration.GetConnectionString("DefaultConnection")
+            ?? configuration.GetConnectionString("SqlServer")
             ?? "Server=(localdb)\\MSSQLLocalDB;Database=ProxyManager;Trusted_Connection=True";
+        var dbProvider = configuration["Database:Provider"] ?? "SqlServer";
 
         services.AddDbContext<ProxyManagerDbContext>(options =>
         {
-            if (connectionString.Contains("Data Source=", StringComparison.OrdinalIgnoreCase)
-                && connectionString.Contains(".db", StringComparison.OrdinalIgnoreCase))
+            if (string.Equals(dbProvider, "Sqlite", StringComparison.OrdinalIgnoreCase))
             {
                 options.UseSqlite(connectionString);
                 return;
+            }
+
+            if (!string.Equals(dbProvider, "SqlServer", StringComparison.OrdinalIgnoreCase))
+            {
+                throw new InvalidOperationException($"Unsupported database provider '{dbProvider}'.");
             }
 
             options.UseSqlServer(connectionString);
@@ -46,7 +53,14 @@ public static class DependencyInjection
             .AddDefaultTokenProviders();
 
         services.AddAuthentication(IdentityConstants.ApplicationScheme)
-            .AddIdentityCookies();
+            .AddIdentityCookies(options =>
+            {
+                options.ApplicationCookie!.Configure(cookie =>
+                {
+                    cookie.LoginPath = "/login";
+                    cookie.AccessDeniedPath = "/login";
+                });
+            });
 
         services.AddAuthorization();
 
@@ -58,6 +72,7 @@ public static class DependencyInjection
         services.AddScoped<IProxyRuntimeConfigGateway, HysteriaRuntimeConfigGateway>();
         services.AddSingleton<IPasswordGenerator, CryptographicPasswordGenerator>();
         services.AddSingleton<IConnectionProfileGenerator, HysteriaConnectionProfileGenerator>();
+        services.AddScoped<IProxyRuntimeApplier, HysteriaDockerComposeRuntimeApplier>();
 
         services.AddScoped<MediatR.INotificationHandler<Application.Clients.ProxyConfigurationChangedNotification>, HysteriaDockerComposeReaction>();
 

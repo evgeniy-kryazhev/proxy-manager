@@ -1,7 +1,6 @@
 using MediatR;
 using ProxyManager.Application.Abstractions;
 using ProxyManager.Domain.Clients;
-
 namespace ProxyManager.Application.Clients;
 
 public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCommand, ClientViewModel>
@@ -47,11 +46,11 @@ public sealed class CreateClientCommandHandler : IRequestHandler<CreateClientCom
             DisplayName: displayName,
             CreatedAt: existing?.CreatedAt ?? DateTimeOffset.UtcNow,
             Status: ClientStatus.Active,
-            Provider: "Hysteria2",
+            Provider: ProxyProviders.Hysteria2,
             LastPasswordRegeneratedAt: null);
 
         await _metadataRepository.UpsertAsync(metadata, cancellationToken);
-        await _mediator.Publish(new ProxyConfigurationChangedNotification("Hysteria2"), cancellationToken);
+        await _mediator.Publish(new ProxyConfigurationChangedNotification(ProxyProviders.Hysteria2), cancellationToken);
 
         return new ClientViewModel(
             Username: username,

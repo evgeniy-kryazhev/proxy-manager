@@ -26,9 +26,9 @@ public sealed class DeleteClientCommandHandler : IRequestHandler<DeleteClientCom
         await _runtimeConfigGateway.RemoveClientAsync(username, cancellationToken);
 
         var metadata = await _metadataRepository.GetByUsernameAsync(username, cancellationToken)
-            ?? new ClientMetadataRecord(username, null, DateTimeOffset.UtcNow, ClientStatus.Active, "Hysteria2", null);
+            ?? new ClientMetadataRecord(username, null, DateTimeOffset.UtcNow, ClientStatus.Active, ProxyProviders.Hysteria2, null);
 
         await _metadataRepository.UpsertAsync(metadata with { Status = ClientStatus.Deleted }, cancellationToken);
-        await _mediator.Publish(new ProxyConfigurationChangedNotification("Hysteria2"), cancellationToken);
+        await _mediator.Publish(new ProxyConfigurationChangedNotification(ProxyProviders.Hysteria2), cancellationToken);
     }
 }

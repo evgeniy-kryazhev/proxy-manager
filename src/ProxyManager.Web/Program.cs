@@ -2,6 +2,7 @@ using MediatR;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using ProxyManager.Application;
 using ProxyManager.Infrastructure;
 using ProxyManager.Infrastructure.Identity;
@@ -25,7 +26,18 @@ var app = builder.Build();
 using (var scope = app.Services.CreateScope())
 {
     var dbContext = scope.ServiceProvider.GetRequiredService<ProxyManagerDbContext>();
-    dbContext.Database.EnsureCreated();
+    if (dbContext.Database.IsSqlite())
+    {
+        if (!SqliteTableExists(dbContext, "AspNetUsers"))
+        {
+            dbContext.Database.EnsureDeleted();
+            dbContext.Database.EnsureCreated();
+        }
+    }
+    else
+    {
+        dbContext.Database.Migrate();
+    }
 }
 
 if (!app.Environment.IsDevelopment())
@@ -40,12 +52,21 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.UseAntiforgery();
 
-app.MapPost("/auth/login", async (SignInManager<ApplicationUser> signInManager, [FromForm] string username, [FromForm] string password) =>
+app.MapPost("/auth/login", async (
+    SignInManager<ApplicationUser> signInManager,
+    [FromForm] string username,
+    [FromForm] string password,
+    [FromForm] string? returnUrl) =>
 {
     var result = await signInManager.PasswordSignInAsync(username, password, isPersistent: true, lockoutOnFailure: true);
     if (result.Succeeded)
     {
-        return Results.Redirect("/");
+        if (!string.IsNullOrWhiteSpace(returnUrl) && Uri.IsWellFormedUriString(returnUrl, UriKind.Relative))
+        {
+            return Results.Redirect(returnUrl);
+        }
+
+        return Results.Redirect("/clients");
     }
 
     if (result.IsLockedOut)
@@ -66,3 +87,33 @@ app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
 app.Run();
+
+static bool SqliteTableExists(DbContext dbContext, string tableName)
+{
+    var connection = dbContext.Database.GetDbConnection();
+    var wasClosed = connection.State != System.Data.ConnectionState.Open;
+    if (wasClosed)
+    {
+        connection.Open();
+    }
+
+    try
+    {
+        using var command = connection.CreateCommand();
+        command.CommandText = "SELECT COUNT(*) FROM sqlite_master WHERE type = 'table' AND name = $name;";
+        var parameter = command.CreateParameter();
+        parameter.ParameterName = "$name";
+        parameter.Value = tableName;
+        command.Parameters.Add(parameter);
+
+        var result = command.ExecuteScalar();
+        return result is long count && count > 0;
+    }
+    finally
+    {
+        if (wasClosed)
+        {
+            connection.Close();
+        }
+    }
+}
