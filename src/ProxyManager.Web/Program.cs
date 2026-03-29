@@ -43,8 +43,6 @@ using (var scope = app.Services.CreateScope())
 if (!app.Environment.IsDevelopment())
 {
     app.UseExceptionHandler("/Error", createScopeForErrors: true);
-    app.UseHsts();
-    app.UseHttpsRedirection();
 }
 app.UseStaticFiles();
 

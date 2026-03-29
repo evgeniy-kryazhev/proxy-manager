@@ -37,6 +37,23 @@ Default Hysteria settings:
 
 For local development, `appsettings.Development.json` points to `/tmp/hysteria/config.yaml`.
 
+If Hysteria runs on another host, enable remote runtime access:
+
+- `Hysteria:Remote:Enabled=true`
+- `Hysteria:Remote:Host=<server-ip-or-hostname>`
+- `Hysteria:Remote:Port=22`
+- `Hysteria:Remote:Username=root`
+- `Hysteria:Remote:PrivateKeyPath=<path-to-private-key>` if the default SSH identity is not used
+- `Hysteria:Remote:KnownHostsPath=<optional-known-hosts-file>` if you do not want to use the default SSH known hosts location
+
+In remote mode the app:
+
+- reads the Hysteria YAML over `ssh user@host "cat /path/to/config.yaml"`
+- writes the YAML back over SSH with backup creation as `<config>.bak`
+- restarts the runtime with `docker compose restart` on the remote host
+
+The current implementation is non-interactive and expects key-based SSH access.
+
 ## Setup
 
 1. Create local Hysteria config for development:
