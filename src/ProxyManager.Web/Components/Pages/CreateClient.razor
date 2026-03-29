@@ -1,0 +1,66 @@
+@page "/clients/create"
+@attribute [Authorize]
+@inject IMediator Mediator
+
+<PageTitle>Create client</PageTitle>
+
+<h1>Create client</h1>
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<EditForm Model="_model" OnValidSubmit="CreateAsync" FormName="create-client-form">
+    <DataAnnotationsValidator />
+    <ValidationSummary />
+
+    <div class="mb-3">
+        <label class="form-label">Username</label>
+        <InputText class="form-control" @bind-Value="_model.Username" />
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label">Display name (optional)</label>
+        <InputText class="form-control" @bind-Value="_model.DisplayName" />
+    </div>
+
+    <button type="submit" class="btn btn-primary">Create</button>
+</EditForm>
+
+@if (_createdClient is not null)
+{
+    <div class="alert alert-success mt-3">
+        <p><strong>Client created.</strong></p>
+        <p>Username: @_createdClient.Username</p>
+        <p>Password: @_createdClient.Password</p>
+        <p class="text-break">URI: @_createdClient.Uri</p>
+    </div>
+}
+
+@code {
+    private readonly CreateClientFormModel _model = new();
+    private ProxyManager.Application.Clients.ClientViewModel? _createdClient;
+    private string? _error;
+
+    private async Task CreateAsync()
+    {
+        try
+        {
+            _createdClient = await Mediator.Send(new ProxyManager.Application.Clients.CreateClientCommand(_model.Username, _model.DisplayName));
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private sealed class CreateClientFormModel
+    {
+        [System.ComponentModel.DataAnnotations.Required]
+        public string Username { get; set; } = string.Empty;
+
+        public string? DisplayName { get; set; }
+    }
+}

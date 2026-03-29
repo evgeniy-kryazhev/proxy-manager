@@ -1,0 +1,103 @@
+@page "/clients"
+@attribute [Authorize]
+@inject IMediator Mediator
+
+<PageTitle>Clients</PageTitle>
+
+<h1>Clients</h1>
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+
+<a class="btn btn-primary mb-3" href="/clients/create">Create client</a>
+
+@if (_clients is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Username</th>
+                <th>Display name</th>
+                <th>Created at</th>
+                <th>Status</th>
+                <th>Provider</th>
+                <th>URI</th>
+                <th>Actions</th>
+            </tr>
+        </thead>
+        <tbody>
+        @foreach (var client in _clients)
+        {
+            <tr>
+                <td>@client.Username</td>
+                <td>@client.DisplayName</td>
+                <td>@(client.CreatedAt == DateTimeOffset.MinValue ? "-" : client.CreatedAt.ToString("u"))</td>
+                <td>@client.Status</td>
+                <td>@client.Provider</td>
+                <td class="text-break">@client.Uri</td>
+                <td>
+                    <a class="btn btn-sm btn-outline-primary me-1" href="@($"/clients/{Uri.EscapeDataString(client.Username)}")">Details</a>
+                    <button class="btn btn-sm btn-outline-warning me-1" @onclick="() => Regenerate(client.Username)">Regenerate password</button>
+                    <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(client.Username)">Delete</button>
+                </td>
+            </tr>
+        }
+        </tbody>
+    </table>
+}
+
+@code {
+    private IReadOnlyCollection<ProxyManager.Application.Clients.ClientViewModel>? _clients;
+    private string? _error;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        try
+        {
+            _clients = await Mediator.Send(new ProxyManager.Application.Clients.GetClientsQuery());
+            _error = null;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+
+    private async Task Delete(string username)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Delete client '{username}'?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await Mediator.Send(new ProxyManager.Application.Clients.DeleteClientCommand(username));
+        await LoadAsync();
+    }
+
+    private async Task Regenerate(string username)
+    {
+        var confirmed = await JS.InvokeAsync<bool>("confirm", $"Regenerate password for '{username}'?");
+        if (!confirmed)
+        {
+            return;
+        }
+
+        await Mediator.Send(new ProxyManager.Application.Clients.RegenerateClientPasswordCommand(username));
+        await LoadAsync();
+    }
+
+    [Inject]
+    private IJSRuntime JS { get; set; } = default!;
+}

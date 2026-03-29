@@ -1,0 +1,42 @@
+@page "/login"
+@attribute [AllowAnonymous]
+
+<PageTitle>Login</PageTitle>
+
+<h1>Login</h1>
+
+@if (_invalidCredentials)
+{
+    <div class="alert alert-danger">Invalid username or password.</div>
+}
+else if (_lockedOut)
+{
+    <div class="alert alert-warning">Account is temporarily locked due to repeated failed logins.</div>
+}
+
+<form method="post" action="/auth/login">
+    <AntiforgeryToken />
+    <div class="mb-3">
+        <label class="form-label" for="username">Username</label>
+        <input class="form-control" id="username" name="username" autocomplete="username" required />
+    </div>
+    <div class="mb-3">
+        <label class="form-label" for="password">Password</label>
+        <input class="form-control" id="password" name="password" autocomplete="current-password" type="password" required />
+    </div>
+    <button type="submit" class="btn btn-primary">Sign in</button>
+</form>
+
+@code {
+    [SupplyParameterFromQuery(Name = "error")]
+    public string? Error { get; set; }
+
+    private bool _invalidCredentials;
+    private bool _lockedOut;
+
+    protected override void OnParametersSet()
+    {
+        _invalidCredentials = string.Equals(Error, "invalid", StringComparison.OrdinalIgnoreCase);
+        _lockedOut = string.Equals(Error, "locked", StringComparison.OrdinalIgnoreCase);
+    }
+}
