@@ -1,0 +1,11 @@
+@page "/"
+
+@code {
+    protected override void OnInitialized()
+    {
+        Navigation.NavigateTo("/clients", replace: true);
+    }
+
+    [Inject]
+    private NavigationManager Navigation { get; set; } = default!;
+}

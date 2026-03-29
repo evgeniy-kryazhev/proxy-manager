@@ -1,0 +1,53 @@
+@page "/clients/{Username}"
+@attribute [Authorize]
+@inject IMediator Mediator
+
+<PageTitle>Client details</PageTitle>
+
+<h1>Client details</h1>
+
+@if (!string.IsNullOrWhiteSpace(_error))
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_client is null)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <dl>
+        <dt>Username</dt>
+        <dd>@_client.Username</dd>
+
+        <dt>Display name</dt>
+        <dd>@_client.DisplayName</dd>
+
+        <dt>Password</dt>
+        <dd>@_client.Password</dd>
+
+        <dt>URI</dt>
+        <dd class="text-break">@_client.Uri</dd>
+    </dl>
+}
+
+@code {
+    [Parameter]
+    public string Username { get; set; } = string.Empty;
+
+    private ProxyManager.Application.Clients.ClientViewModel? _client;
+    private string? _error;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        try
+        {
+            _client = await Mediator.Send(new ProxyManager.Application.Clients.GetClientDetailsQuery(Username));
+            _error = _client is null ? "Client not found." : null;
+        }
+        catch (Exception ex)
+        {
+            _error = ex.Message;
+        }
+    }
+}

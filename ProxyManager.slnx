@@ -1,2 +1,8 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ProxyManager.Application/ProxyManager.Application.csproj" />
+    <Project Path="src/ProxyManager.Domain/ProxyManager.Domain.csproj" />
+    <Project Path="src/ProxyManager.Infrastructure/ProxyManager.Infrastructure.csproj" />
+    <Project Path="src/ProxyManager.Web/ProxyManager.Web.csproj" />
+  </Folder>
 </Solution>
